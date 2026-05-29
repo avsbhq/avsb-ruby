@@ -34,7 +34,7 @@ RSpec.describe Avsb::Core::Evaluator do
       "sdkKey"            => "test-key",
       "environmentKey"    => "production",
       "publishedAt"       => "2026-01-01T00:00:00.000Z",
-      "collectEndpoint"   => "https://collect.avsb.cloud/v1/events",
+      "collectEndpoint"   => "https://ingest.avsb.cloud/v1/events",
       "flags"             => flags,
       "audiences"         => audiences,
       "holdouts"          => holdouts,
