@@ -13,12 +13,20 @@ Gem::Specification.new do |spec|
                      "Evaluates feature flags and A/B experiments against a " \
                      "downloaded datafile, with support for holdouts, bandits, " \
                      "multi-context audiences, sticky bucketing, and OpenFeature."
-  spec.homepage    = "https://avsb.cloud"
+  spec.homepage    = "https://github.com/avsbhq/avsb-ruby"
   spec.license     = "MIT"
+
+  spec.metadata = {
+    "homepage_uri"      => "https://avsb.cloud",
+    "source_code_uri"   => "https://github.com/avsbhq/avsb-ruby",
+    "bug_tracker_uri"   => "https://github.com/avsbhq/avsb-ruby/issues",
+    "documentation_uri" => "https://avsb.cloud/docs",
+    "changelog_uri"     => "https://github.com/avsbhq/avsb-ruby/blob/main/CHANGELOG.md"
+  }
 
   spec.required_ruby_version = ">= 3.1.0"
 
-  spec.files = Dir["lib/**/*", "README.md", "avsb.gemspec"]
+  spec.files = Dir["lib/**/*", "README.md", "LICENSE", "avsb.gemspec"]
 
   # Runtime: zero hard dependencies — optional integrations guard-require at call-time.
 
