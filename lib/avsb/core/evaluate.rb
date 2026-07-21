@@ -6,7 +6,7 @@ require_relative "holdouts"
 
 module Avsb
   module Core
-    # Flag evaluator — pure function over (flag_key, default_value, context, datafile).
+    # Flag evaluator: pure function over (flag_key, default_value, context, datafile).
     # Mirrors the logic in packages/avsb-core/src/evaluate.ts step-for-step.
     module Evaluator
       RESERVED_KEYS = %w[kind key name _meta].freeze

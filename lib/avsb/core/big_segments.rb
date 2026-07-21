@@ -2,7 +2,7 @@
 
 module Avsb
   module Core
-    # BigSegmentStore interface (module) — implementations must respond to
+    # BigSegmentStore interface (module): implementations must respond to
     # #is_member?, #membership, and #healthy?
     #
     # Spec §2.9.

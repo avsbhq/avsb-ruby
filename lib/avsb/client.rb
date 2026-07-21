@@ -10,7 +10,7 @@ require_relative "logger"
 require_relative "core/evaluate"
 
 module Avsb
-  # Avsb::Server — server-side feature flag client.
+  # Avsb::Server: server-side feature flag client.
   #
   # Quickstart:
   #   client = Avsb::Server.new(sdk_key: ENV["AVSB_SDK_KEY"])

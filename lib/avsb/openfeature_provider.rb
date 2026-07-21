@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# OpenFeature provider — optional integration.
+# OpenFeature provider: optional integration.
 # Requires the openfeature-sdk gem:
 #   gem "openfeature-sdk"
 #
@@ -33,28 +33,28 @@ module Avsb
       { name: PROVIDER_NAME }
     end
 
-    # Boolean resolution — maps to get_bool_flag.
+    # Boolean resolution: maps to get_bool_flag.
     def resolve_boolean_value(flag_key, default_value, evaluation_context = nil)
       flag = @client.get_bool_flag(flag_key, default_value: default_value,
                                     context: context_from_of(evaluation_context))
       build_resolution(flag, default_value)
     end
 
-    # String resolution — maps to get_string_flag.
+    # String resolution: maps to get_string_flag.
     def resolve_string_value(flag_key, default_value, evaluation_context = nil)
       flag = @client.get_string_flag(flag_key, default_value: default_value,
                                       context: context_from_of(evaluation_context))
       build_resolution(flag, default_value)
     end
 
-    # Number resolution — maps to get_number_flag.
+    # Number resolution: maps to get_number_flag.
     def resolve_number_value(flag_key, default_value, evaluation_context = nil)
       flag = @client.get_number_flag(flag_key, default_value: default_value,
                                       context: context_from_of(evaluation_context))
       build_resolution(flag, default_value)
     end
 
-    # Object/JSON resolution — maps to get_json_flag.
+    # Object/JSON resolution: maps to get_json_flag.
     def resolve_object_value(flag_key, default_value, evaluation_context = nil)
       flag = @client.get_json_flag(flag_key, default_value: default_value,
                                    context: context_from_of(evaluation_context))

@@ -1,4 +1,4 @@
-# avsb — Ruby SDK
+# avsb: Ruby SDK
 
 Server-side Ruby SDK for the [A vs B](https://app.avsb.cloud) feature-flag and experimentation platform.
 
@@ -22,7 +22,7 @@ bundle install
 
 Gem name: `avsb`. Version: `1.0.0`. **Runtime requirement:** Ruby 3.1 or later.
 
-Optional integrations (guard-required at instantiation — not loaded unless the gem is present):
+Optional integrations (guard-required at instantiation; not loaded unless the gem is present):
 
 | Integration | Gem |
 |---|---|
@@ -101,7 +101,7 @@ end
 
 ## 3. SDK keys
 
-Get a **server SDK key** from your A vs B project's Environments page. Store it in an environment variable — never hard-code it.
+Get a **server SDK key** from your A vs B project's Environments page. Store it in an environment variable; never hard-code it.
 
 ```bash
 export AVSB_SDK_KEY=sdk-...
@@ -123,13 +123,13 @@ Never use the public (client-side) SDK key in server code. Server SDK keys carry
 context = { "kind" => "user", "key" => "alice", "plan" => "pro", "beta_tester" => true }
 ```
 
-### `identify(context)` — notify downstream integrations
+### `identify(context)`: notify downstream integrations
 
 ```ruby
 client.identify(context)
 ```
 
-### `on_ready` / `on_error` — lifecycle callbacks
+### `on_ready` / `on_error`: lifecycle callbacks
 
 ```ruby
 client = Avsb::Server.new(
@@ -147,7 +147,7 @@ client
   .on_error  { |err|    Rails.logger.error("avsb error: #{err}") }
 ```
 
-### `replace_datafile(new_datafile)` — hot-swap the datafile
+### `replace_datafile(new_datafile)`: hot-swap the datafile
 
 Use with the streaming integration to apply real-time datafile updates:
 
@@ -155,7 +155,7 @@ Use with the streaming integration to apply real-time datafile updates:
 client.replace_datafile(new_datafile)
 ```
 
-### `close` — stop background polling
+### `close`: stop background polling
 
 ```ruby
 client.close
@@ -194,21 +194,21 @@ config       = client.get_json_flag("api-config",    default_value: {},        c
 
 Each shortcut returns the raw typed value extracted from the `Avsb::Flag` envelope.
 
-### `Avsb::Flag` — full evaluation envelope
+### `Avsb::Flag`: full evaluation envelope
 
 ```ruby
 flag = client.get_bool_flag("checkout-v2", default_value: false, context: context)
 
-flag.value           # T — the evaluated value (Boolean here)
-flag.variation_key   # String or nil — matched variation key
-flag.source          # String — "rule" / "holdout" / "default" / "not_found" / ...
-flag.rule_id         # String or nil — matched rule id
-flag.rule_type       # String or nil — "ab_test" / "targeted_delivery" / "holdout" / "bandit"
-flag.reasons         # Array<String> — always frozen
-flag.evaluated_at    # Integer — ms epoch
-flag.duration_micros # Integer — microseconds spent in evaluator
-flag.enabled?        # Boolean — source=="rule" && !!value
-flag.exists?         # Boolean — source != "not_found"
+flag.value           # T: the evaluated value (Boolean here)
+flag.variation_key   # String or nil: matched variation key
+flag.source          # String: "rule" / "holdout" / "default" / "not_found" / ...
+flag.rule_id         # String or nil: matched rule id
+flag.rule_type       # String or nil: "ab_test" / "targeted_delivery" / "holdout" / "bandit"
+flag.reasons         # Array<String>: always frozen
+flag.evaluated_at    # Integer: ms epoch
+flag.duration_micros # Integer: microseconds spent in evaluator
+flag.enabled?        # Boolean: source=="rule" && !!value
+flag.exists?         # Boolean: source != "not_found"
 ```
 
 `enabled?` is also aliased as `enabled` for contexts where the question-mark form is inconvenient.
@@ -220,7 +220,7 @@ After processing a request, flush the decision log to retrieve all evaluations:
 ```ruby
 entries = client.decision_log.entries
 # Each entry is an Avsb::DecisionLogEntry with the same fields as Avsb::Flag
-# plus context_summary: [{ kind:, key: }] — attributes are never logged.
+# plus context_summary: [{ kind:, key: }]; attributes are never logged.
 ```
 
 ---
@@ -451,7 +451,7 @@ value  = client.get_bool_flag("checkout-v2", default_value: false, context: ctx)
 ```
 
 ```ruby
-# LaunchDarkly — multi-context
+# LaunchDarkly (multi-context)
 multi_context = LaunchDarkly::LDContext.create_multi(
   LaunchDarkly::LDContext.create({ kind: "user", key: "alice" }),
   LaunchDarkly::LDContext.create({ kind: "organization", key: "acme", tier: "enterprise" })
@@ -459,7 +459,7 @@ multi_context = LaunchDarkly::LDContext.create_multi(
 ```
 
 ```ruby
-# A vs B — multi-context
+# A vs B (multi-context)
 ctx = {
   "kind"         => "multi",
   "user"         => { "kind" => "user",         "key" => "alice" },
@@ -490,11 +490,11 @@ gate = client.get_bool_flag("checkout-v2", default_value: false, context: ctx).e
 ```
 
 ```ruby
-# Statsig — track event
+# Statsig (track event)
 Statsig.log_event(user, "purchase", value: 49.99, metadata: { "plan" => "pro" })
 ```
 
 ```ruby
-# A vs B — track event
+# A vs B (track event)
 client.track("purchase", context: ctx, value: 49.99, properties: { plan: "pro" })
 ```

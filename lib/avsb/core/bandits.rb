@@ -4,10 +4,10 @@ require_relative "hash"
 
 module Avsb
   module Core
-    # Bandit evaluation engine — epsilon-greedy, Thompson sampling, UCB1.
+    # Bandit evaluation engine: epsilon-greedy, Thompson sampling, UCB1.
     #
     # Design invariants (preserved from the TypeScript source):
-    #   - Algorithms are pure functions: no rand() — seeded from murmurhash3.
+    #   - Algorithms are pure functions: no rand(); seeded from murmurhash3.
     #   - Tie-breaking is alphabetical on action id for determinism.
     module Bandits
       MAX_BUCKET  = 10_000

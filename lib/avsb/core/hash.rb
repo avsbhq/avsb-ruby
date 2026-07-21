@@ -2,7 +2,7 @@
 
 module Avsb
   module Core
-    # MurmurHash3_x86_32 — deterministic 32-bit hash for visitor bucketing.
+    # MurmurHash3_x86_32: deterministic 32-bit hash for visitor bucketing.
     #
     # Ported verbatim from packages/avsb-core/src/hash.ts.  All intermediate
     # values are masked to 32 bits with & 0xFFFFFFFF to replicate JavaScript's
@@ -73,7 +73,7 @@ module Avsb
         h1
       end
 
-      # 32-bit truncating multiply — replicates Math.imul() from JavaScript.
+      # 32-bit truncating multiply: replicates Math.imul() from JavaScript.
       def self.imul32(a, b)
         # Mask inputs to 32 bits, multiply, mask result to 32 bits.
         ((a & MASK32) * (b & MASK32)) & MASK32

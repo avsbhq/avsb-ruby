@@ -4,8 +4,8 @@ module Avsb
   module Middleware
     # Rails integration.
     #
-    # 1. Railtie — auto-loads when railties is available.
-    # 2. Controller concern — adds `avsb_client` helper to any controller that
+    # 1. Railtie: auto-loads when railties is available.
+    # 2. Controller concern: adds `avsb_client` helper to any controller that
     #    includes `Avsb::Middleware::Rails::Controller`.
     #
     # Quickstart (config/initializers/avsb.rb):
@@ -37,7 +37,7 @@ module Avsb
         end
       end
 
-      # Railtie — wires up the initializer and middleware when Rails is present.
+      # Railtie: wires up the initializer and middleware when Rails is present.
       if defined?(::Rails::Railtie)
         class Railtie < ::Rails::Railtie
           initializer "avsb.middleware" do |app|

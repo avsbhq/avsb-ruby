@@ -4,7 +4,7 @@ module Avsb
   module TestUtils
     # In-memory datafile loader for unit tests.
     # Accepts a plain Hash (already-parsed datafile JSON) and serves it
-    # synchronously — no network call, no background thread.
+    # synchronously; no network call, no background thread.
     class InMemoryDatafileLoader
       attr_accessor :datafile
 
@@ -25,7 +25,7 @@ module Avsb
         nil
       end
 
-      # Synchronous fetch — returns the stored datafile immediately.
+      # Synchronous fetch: returns the stored datafile immediately.
       def fetch
         @datafile
       end

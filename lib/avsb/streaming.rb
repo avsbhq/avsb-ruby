@@ -9,7 +9,7 @@ module Avsb
   #
   # Connects to an SSE endpoint and yields parsed datafile Hashes to the
   # caller's block whenever a `data:` line with a JSON datafile arrives.
-  # Runs on its own background thread — call +stop+ to shut it down.
+  # Runs on its own background thread; call +stop+ to shut it down.
   #
   # Usage:
   #   stream = Avsb::Streaming.new("https://stream.avsb.cloud/v1/sse?sdkKey=...")

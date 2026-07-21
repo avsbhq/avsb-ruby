@@ -4,7 +4,7 @@ require_relative "hash"
 
 module Avsb
   module Core
-    # Holdout evaluator — spec §8.2.
+    # Holdout evaluator: spec §8.2.
     #
     # Walks the datafile's active holdouts; the first one that participates in
     # +flag_id+ and whose bucket lands inside its traffic-allocation window

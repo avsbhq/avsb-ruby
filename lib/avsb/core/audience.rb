@@ -4,9 +4,9 @@ require_relative "hash"
 
 module Avsb
   module Core
-    # Server-side audience evaluator — evaluates only CUSTOM_ATTRIBUTE conditions.
+    # Server-side audience evaluator: evaluates only CUSTOM_ATTRIBUTE conditions.
     # Browser-detected conditions (DEVICE, BROWSER, PLATFORM, LANGUAGE, COOKIE,
-    # QUERY_PARAM) always return false on the server — the Ruby SDK is server-only.
+    # QUERY_PARAM) always return false on the server; the Ruby SDK is server-only.
     module Audience
       RESERVED_KEYS = %w[kind key name _meta].freeze
 
