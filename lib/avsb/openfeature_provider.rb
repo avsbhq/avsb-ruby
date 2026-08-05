@@ -77,6 +77,20 @@ module Avsb
     end
 
     def build_resolution(flag, default_value)
+      # An SDK with no datafile loaded is PROVIDER_NOT_READY in OpenFeature
+      # terms, not a plain default. Telling those two apart is the whole point
+      # of the not_ready source.
+      if flag.source == Avsb::Core::EvaluationSource::NOT_READY
+        return {
+          value:         flag.value,
+          variant:       nil,
+          reason:        "ERROR",
+          error_code:    "PROVIDER_NOT_READY",
+          error_message: "The A vs B SDK has not loaded a datafile yet. Call " \
+                         "Avsb::Server#wait_for_ready before evaluating.",
+        }
+      end
+
       {
         value:         flag.value,
         variant:       flag.variation_key,
@@ -95,18 +109,19 @@ module Avsb
     end
 
     # Map Avsb evaluation source strings to OpenFeature reason strings.
+    # not_ready never reaches here: build_resolution answers it above.
     def map_reason(source)
       case source
-      when "rule"              then "TARGETING_MATCH"
-      when "override"          then "STATIC"
-      when "datafileOverride"  then "STATIC"
-      when "runtimeOverride"   then "STATIC"
-      when "sticky"            then "CACHED"
-      when "holdout"           then "TARGETING_MATCH"
-      when "default"           then "DEFAULT"
-      when "not_found"         then "DEFAULT"
-      when "disabled"          then "DISABLED"
-      else                          "UNKNOWN"
+      when "rule"             then "TARGETING_MATCH"
+      when "datafileOverride" then "STATIC"
+      when "runtimeOverride"  then "STATIC"
+      when "sticky"           then "CACHED"
+      when "holdout"          then "TARGETING_MATCH"
+      when "bandit"           then "TARGETING_MATCH"
+      when "default"          then "DEFAULT"
+      when "not_found"        then "DEFAULT"
+      when "disabled"         then "DISABLED"
+      else                         "UNKNOWN"
       end
     end
   end

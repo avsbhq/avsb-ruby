@@ -208,11 +208,21 @@ module Avsb
         }
       end
 
+      # Bandit bucketing uses the `user` sub-context's key, exactly like
+      # bucketingKey(context) in the reference: a context of another kind
+      # buckets as the empty string rather than leaking its own key in.
+      #
+      # `::Hash` is deliberate. Avsb::Core::Hash (murmur) shadows Ruby's Hash
+      # inside this namespace, so a bare `is_a?(Hash)` is always false.
       def self.bucketing_key_from_context(ctx)
-        return ctx["key"].to_s unless ctx["kind"] == "multi"
+        return "" unless ctx.is_a?(::Hash)
 
-        user = ctx["user"]
-        user.is_a?(Hash) ? user["key"].to_s : ""
+        if ctx["kind"] == "multi"
+          user = ctx["user"]
+          return user.is_a?(::Hash) && user["kind"] == "user" ? user["key"].to_s : ""
+        end
+
+        ctx["kind"] == "user" ? ctx["key"].to_s : ""
       end
       private_class_method :bucketing_key_from_context
     end

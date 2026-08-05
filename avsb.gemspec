@@ -26,7 +26,9 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.1.0"
 
-  spec.files = Dir["lib/**/*", "README.md", "LICENSE", "avsb.gemspec"]
+  # CHANGELOG.md ships in the gem because metadata["changelog_uri"] points at
+  # it, and that link was dead until the file existed.
+  spec.files = Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE", "avsb.gemspec"]
 
   # Runtime: zero hard dependencies — optional integrations guard-require at call-time.
 

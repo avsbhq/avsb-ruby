@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "hash"
+require_relative "context_resolver"
 
 module Avsb
   module Core
@@ -21,7 +22,12 @@ module Avsb
 
           bucket_key = resolve_bucket_key(context, holdout["hashAttribute"])
           hash       = Avsb::Core::Hash.murmurhash3("#{holdout["key"]}:#{bucket_key}") % 10_000
-          threshold  = (holdout["trafficAllocation"].to_f * 10_000).floor
+          # Float comparison, never a truncation. Flooring put holdouts one
+          # bucket out of step with the ab_test allocation check in
+          # evaluate.rb: a 0.12345 holdout has a threshold of 1234.5, so
+          # bucket 1234 is inside the window, while the floored form compared
+          # against 1234 and let that context through.
+          threshold = holdout["trafficAllocation"].to_f * 10_000
           next if hash >= threshold
 
           variation_id = (holdout["defaultVariationByFlag"] || {})[flag_id]
@@ -33,12 +39,14 @@ module Avsb
         { held_out: false }
       end
 
+      # The bucketing key for this holdout's hashAttribute. An absent kind or
+      # attribute resolves to the empty string, which is a stable
+      # classification rather than a crash on missing data.
       def self.resolve_bucket_key(context, hash_attribute)
-        require_relative "evaluate"
-        val = Evaluator.resolve_dotted_attribute(context, hash_attribute || "userId")
-        return "" if val.nil?
+        value = ContextResolver.resolve_dotted_attribute(context, hash_attribute || "userId")
+        return "" if value.nil?
 
-        val.to_s
+        value.to_s
       end
     end
   end

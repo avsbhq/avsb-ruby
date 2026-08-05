@@ -3,26 +3,40 @@
 require_relative "hash"
 require_relative "audience"
 require_relative "holdouts"
+require_relative "js_value"
+require_relative "context_resolver"
+require_relative "bandit_dispatch"
 
 module Avsb
   module Core
     # Flag evaluator: pure function over (flag_key, default_value, context, datafile).
-    # Mirrors the logic in packages/avsb-core/src/evaluate.ts step-for-step.
+    # Mirrors packages/avsb-core/src/evaluate.ts step for step, and every
+    # step is locked by the conformance corpus, including the exact reason
+    # strings in their exact order.
+    #
+    # Context reading (kinds, keys, dotted paths) lives in
+    # Avsb::Core::ContextResolver, which audience matching and holdout
+    # bucketing share.
     module Evaluator
-      RESERVED_KEYS = %w[kind key name _meta].freeze
+      MAX_BUCKET = 10_000
 
       # Evaluate +flag_key+ against +datafile+ for the given +context+.
       #
-      # +context+       - plain Hash in EvalContext wire shape (SingleContext or MultiContext)
-      # +datafile+       - plain Hash loaded from a FlagDatafile JSON
-      # +default_value+  - caller-supplied fallback value
-      # +reasons+        - optional Array to accumulate reason strings
-      # +on_exposure+    - optional callable invoked with an exposure Hash on ab_test bucketing
-      #
-      # Returns a Hash with keys: :value, :variation_key, :source, :rule_id, :rule_type,
-      #   :flag_key, :reasons
+      # @param flag_key [String] the flag key to evaluate
+      # @param default_value [Object] caller-supplied fallback value
+      # @param context [Hash] plain Hash in EvalContext wire shape
+      #   (SingleContext or MultiContext)
+      # @param datafile [Hash] plain Hash parsed from a FlagDatafile JSON
+      # @param on_exposure [Proc, nil] called with an exposure Hash when an
+      #   ab_test, bandit, or holdout decision is served
+      # @param reasons [Array<String>, nil] accumulator for the decision trail
+      # @param bandit_model_store [Object, nil] object responding to
+      #   +get_model(key)+ / +update_model(key, model)+. When nil, bandit
+      #   rules run their cold-start policy instead of being skipped.
+      # @return [Hash{Symbol=>Object}] keys +:value+, +:variation_key+,
+      #   +:source+, +:rule_id+, +:rule_type+, +:flag_key+, +:reasons+
       def self.evaluate_flag(flag_key, default_value, context, datafile,
-                             on_exposure: nil, reasons: nil)
+                             on_exposure: nil, reasons: nil, bandit_model_store: nil)
         reasons ||= []
 
         # 1. FIND FLAG
@@ -42,7 +56,14 @@ module Avsb
         end
 
         # 3. CHECK OVERRIDES
-        primary_key = bucketing_key(context, "user") || primary_context_key(context)
+        #
+        # Overrides match on the primary context's key (legacy "userId").
+        # The `user` kind wins; when there is no user sub-context the first
+        # declared kind is the primary. The empty-string check is deliberate:
+        # in JavaScript "" is falsy and the reference falls through to the
+        # primary context, while in Ruby "" is truthy and would stop here.
+        primary_key = ContextResolver.bucketing_key(context, "user")
+        primary_key = ContextResolver.primary_context_key(context) if primary_key.empty?
 
         override = (flag["overrides"] || []).find { |o| o["userId"] == primary_key }
         if override
@@ -54,6 +75,10 @@ module Avsb
         end
 
         # 4. HOLDOUT CHECK
+        #
+        # Fires between overrides and the rules loop so datafile overrides
+        # still win (explicit operator intent), while every regular rule
+        # evaluation honours the holdout.
         holdout_result = Holdouts.evaluate_holdout(context, flag["id"], datafile)
         if holdout_result[:held_out] && holdout_result[:holdout]
           h          = holdout_result[:holdout]
@@ -66,7 +91,7 @@ module Avsb
             "variationId"  => target_vid,
             "eventName"    => "flag_holdout_exposure",
             "revenue"      => nil,
-            "timestamp"    => (Time.now.to_f * 1000).to_i,
+            "timestamp"    => now_ms,
             "pageUrl"      => "",
             "properties"   => {
               "flagKey"    => flag_key,
@@ -86,6 +111,7 @@ module Avsb
         # Build audience map
         audience_map = {}
         (datafile["audiences"] || []).each { |a| audience_map[a["id"]] = a }
+        currency_exponent = datafile["currencyExponent"]
 
         # 5. EVALUATE RULES (first match wins)
         (flag["rules"] || []).each do |rule|
@@ -95,15 +121,16 @@ module Avsb
           end
 
           hash_path  = rule["hashAttribute"] || "userId"
-          hash_value = resolve_dotted_attribute(context, hash_path).to_s
+          resolved   = ContextResolver.resolve_dotted_attribute(context, hash_path)
+          hash_value = resolved.nil? ? "" : resolved.to_s
 
           # a. CHECK AUDIENCE
-          if rule["audienceIds"] && rule["audienceIds"].length > 0
+          if rule["audienceIds"] && !rule["audienceIds"].empty?
             matched = rule["audienceIds"].any? do |aud_id|
               aud = audience_map[aud_id]
               next false unless aud
 
-              Audience.evaluate_audience(aud, context)
+              Audience.evaluate_audience(aud, context, currency_exponent: currency_exponent)
             end
             unless matched
               reasons << "rule \"#{rule["id"]}\" skipped (audience not matched)"
@@ -118,51 +145,32 @@ module Avsb
 
             target_var = get_variation(flag, rule["variations"][0]["variationId"])
             vk = target_var ? target_var["key"] : nil
-            reasons << "rule \"#{rule["id"]}\" matched (targeted_delivery), serving variation \"#{vk}\""
+            reasons << "rule \"#{rule["id"]}\" matched (targeted_delivery), " \
+                       "serving variation \"#{key_text(target_var)}\""
             val = target_var ? target_var["value"] : default_value
             return build_result(val, vk, "rule", rule["id"], "targeted_delivery", flag_key, reasons)
 
           when "ab_test"
-            alloc_hash = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}__#{rule["id"]}") % 10_000
-            traffic    = rule["trafficAllocation"]
-            if traffic && alloc_hash >= (traffic * 10_000).to_i
-              reasons << "rule \"#{rule["id"]}\" excluded by traffic allocation " \
-                         "(hash #{alloc_hash} >= threshold #{(traffic * 10_000).to_i})"
-              next
-            end
+            result = evaluate_ab_test(
+              flag, rule, flag_key, default_value, hash_value, reasons, on_exposure
+            )
+            next unless result
 
-            bucket      = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}") % 10_000
-            cumulative  = 0
-            matched_var = nil
-            matched_rv  = nil
+            return result
 
-            (rule["variations"] || []).each do |rv|
-              cumulative += (rv["percentage"] * 10_000).to_i
-              if bucket < cumulative
-                matched_rv  = rv
-                matched_var = get_variation(flag, rv["variationId"])
-                break
-              end
-            end
+          when "bandit"
+            result = evaluate_bandit_rule(
+              flag, rule, flag_key, hash_value, context, datafile, reasons,
+              on_exposure, bandit_model_store
+            )
+            next unless result
 
-            next unless matched_rv
+            return result
 
-            on_exposure&.call({
-              "visitorId"    => hash_value,
-              "experimentId" => rule["id"],
-              "variationId"  => matched_rv["variationId"],
-              "eventName"    => "flag_exposure",
-              "revenue"      => nil,
-              "timestamp"    => (Time.now.to_f * 1000).to_i,
-              "pageUrl"      => "",
-              "properties"   => { "flagKey" => flag_key, "flagId" => flag["id"] },
-            })
-
-            vk = matched_var ? matched_var["key"] : nil
-            reasons << "rule \"#{rule["id"]}\" matched (ab_test), bucketed into variation " \
-                       "\"#{vk}\" (hash #{bucket}/#{cumulative})"
-            val = matched_var ? matched_var["value"] : default_value
-            return build_result(val, vk, "rule", rule["id"], "ab_test", flag_key, reasons)
+          else
+            # Unknown rule type on the wire: name it rather than dropping it.
+            reasons << "rule \"#{rule["id"]}\" skipped (unsupported rule type \"#{rule["type"]}\")"
+            next
           end
         end
 
@@ -174,79 +182,153 @@ module Avsb
         build_result(val, key, "default", nil, nil, flag_key, reasons)
       end
 
-      # Resolve a dotted attribute path (e.g. "user.key", "organization.tier")
-      # against a context Hash.  Non-dotted paths fall back to primary context.
-      def self.resolve_dotted_attribute(context, dotted_path)
-        return nil if dotted_path.nil? || dotted_path.empty?
-
-        dot_idx = dotted_path.index(".")
-        if dot_idx && dot_idx > 0
-          kind = dotted_path[0, dot_idx]
-          attr = dotted_path[(dot_idx + 1)..]
-          sub  = get_context_by_kind(context, kind)
-          return nil unless sub
-
-          return read_sub_attribute(sub, attr)
+      # ab_test branch. Returns a result Hash on a match, nil to continue to
+      # the next rule.
+      def self.evaluate_ab_test(flag, rule, flag_key, default_value, hash_value,
+                                reasons, on_exposure)
+        # Traffic allocation is a FLOAT comparison against the raw product,
+        # never a truncated or rounded integer. A 0.12345 rollout puts the
+        # threshold at 1234.5: bucket 1234 is inside it, while a port that
+        # truncates to 1234 excludes that context and diverges by one bucket
+        # in ten thousand. The boundary fixtures lock both the fractional and
+        # the integer forms.
+        alloc_hash = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}__#{rule["id"]}") % MAX_BUCKET
+        traffic    = rule["trafficAllocation"]
+        unless traffic.nil?
+          threshold = traffic.to_f * MAX_BUCKET
+          if alloc_hash >= threshold
+            reasons << "rule \"#{rule["id"]}\" excluded by traffic allocation " \
+                       "(hash #{alloc_hash} >= threshold #{JsValue.number_to_s(threshold)})"
+            return nil
+          end
         end
 
-        # Non-dotted — legacy lookup against primary context.
-        primary = primary_single_context(context)
-        return nil unless primary
+        bucket     = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}") % MAX_BUCKET
+        cumulative = 0.0
 
-        return primary["key"] if dotted_path == "userId"
+        (rule["variations"] || []).each do |rv|
+          # Cumulative boundaries stay in floating point for the same reason
+          # the threshold does: 0.12345 accumulates to 1234.5, and bucket
+          # 1234 belongs to the first variation.
+          cumulative += rv["percentage"].to_f * MAX_BUCKET
+          next unless bucket < cumulative
 
-        read_sub_attribute(primary, dotted_path)
-      end
+          exp_var = get_variation(flag, rv["variationId"])
 
-      def self.read_sub_attribute(sub, attr)
-        return sub["key"]  if attr == "key"
-        return sub["name"] if attr == "name"
-        return nil         if RESERVED_KEYS.include?(attr)
+          if on_exposure && exp_var
+            on_exposure.call({
+              "visitorId"    => hash_value,
+              "experimentId" => rule["id"],
+              "variationId"  => rv["variationId"],
+              "eventName"    => "flag_exposure",
+              "revenue"      => nil,
+              "timestamp"    => now_ms,
+              "pageUrl"      => "",
+              "properties"   => { "flagKey" => flag_key, "flagId" => flag["id"] },
+            })
+          end
 
-        sub[attr]
-      end
-
-      def self.multi_context?(ctx)
-        ctx.is_a?(Hash) && ctx["kind"] == "multi"
-      end
-
-      def self.get_context_by_kind(ctx, kind)
-        if multi_context?(ctx)
-          candidate = ctx[kind]
-          return nil unless candidate.is_a?(Hash)
-          return nil unless candidate["kind"] == kind
-
-          candidate
-        else
-          ctx["kind"] == kind ? ctx : nil
+          reasons << "rule \"#{rule["id"]}\" matched (ab_test), bucketed into variation " \
+                     "\"#{key_text(exp_var)}\" (hash #{bucket}/#{JsValue.number_to_s(cumulative)})"
+          val = exp_var ? exp_var["value"] : default_value
+          vk  = exp_var ? exp_var["key"] : nil
+          return build_result(val, vk, "rule", rule["id"], "ab_test", flag_key, reasons)
         end
-      end
 
-      def self.bucketing_key(ctx, kind = "user")
-        sub = get_context_by_kind(ctx, kind)
-        sub ? sub["key"].to_s : ""
-      end
-
-      def self.primary_single_context(ctx)
-        return ctx unless multi_context?(ctx)
-
-        sub = ctx["user"]
-        return sub if sub.is_a?(Hash)
-
-        ctx.each do |k, v|
-          next if k == "kind"
-          return v if v.is_a?(Hash)
-        end
         nil
       end
 
-      def self.primary_context_key(ctx)
-        pc = primary_single_context(ctx)
-        pc ? pc["key"].to_s : ""
+      # bandit branch. Returns a result Hash on a match, nil to continue to
+      # the next rule. Every exit appends a reason: a bandit rule must never
+      # disappear from the decision trail.
+      def self.evaluate_bandit_rule(flag, rule, flag_key, hash_value, context, datafile,
+                                    reasons, on_exposure, bandit_model_store)
+        bandit = BanditDispatch.resolve_rule_bandit(rule, datafile)
+        unless bandit
+          reasons << if rule["banditId"]
+                       "rule \"#{rule["id"]}\" skipped (banditId \"#{rule["banditId"]}\" " \
+                       "is not in datafile.bandits)"
+                     else
+                       "rule \"#{rule["id"]}\" skipped (bandit rule carries no bandit config)"
+                     end
+          return nil
+        end
+
+        actions = bandit[:config]["actions"] || []
+        if actions.empty?
+          reasons << "rule \"#{rule["id"]}\" skipped (bandit \"#{bandit[:key]}\" declares no actions)"
+          return nil
+        end
+
+        store    = BanditDispatch.store_for(bandit[:config], bandit_model_store)
+        decision = Bandits.evaluate_bandit(bandit[:key], bandit[:config], context, store)
+        unless decision
+          reasons << "rule \"#{rule["id"]}\" skipped (bandit \"#{bandit[:key]}\" " \
+                     "has no model in the supplied store)"
+          return nil
+        end
+
+        action     = decision[:action]
+        bandit_var = get_variation(flag, action["variationId"])
+        unless bandit_var
+          reasons << "rule \"#{rule["id"]}\" skipped (bandit \"#{bandit[:key]}\" " \
+                     "action \"#{action["id"]}\" targets unknown variation " \
+                     "\"#{action["variationId"]}\")"
+          return nil
+        end
+
+        on_exposure&.call({
+          "visitorId"    => hash_value,
+          "experimentId" => rule["id"],
+          "variationId"  => action["variationId"],
+          "eventName"    => "flag_exposure",
+          "revenue"      => nil,
+          "timestamp"    => now_ms,
+          "pageUrl"      => "",
+          "properties"   => {
+            "flagKey"   => flag_key,
+            "flagId"    => flag["id"],
+            "banditKey" => bandit[:key],
+            "actionId"  => action["id"],
+          },
+        })
+
+        reasons << "rule \"#{rule["id"]}\" matched (bandit \"#{bandit[:key]}\"), " \
+                   "served action \"#{action["id"]}\" into variation \"#{bandit_var["key"]}\""
+        build_result(bandit_var["value"], bandit_var["key"], "bandit", rule["id"], "bandit",
+                     flag_key, reasons)
+      end
+
+      # Resolve a dotted attribute path against a context.
+      #
+      # Kept on the evaluator because the reference exports it from evaluate.ts
+      # for exactly this reason: the bucketing input is part of the evaluation
+      # contract, not an implementation detail. The rules live in
+      # Avsb::Core::ContextResolver, which audience matching and holdout
+      # bucketing share.
+      #
+      # @param context [Hash]
+      # @param dotted_path [String, nil]
+      # @return [Object, nil] the resolved value, or nil when unresolvable
+      def self.resolve_dotted_attribute(context, dotted_path)
+        ContextResolver.resolve_dotted_attribute(context, dotted_path)
       end
 
       def self.get_variation(flag, variation_id)
         (flag["variations"] || []).find { |v| v["id"] == variation_id }
+      end
+
+      # Reason strings print the variation key the reference prints. When the
+      # rule points at a variation the flag no longer carries, the reference
+      # interpolates a missing value and JavaScript renders the word
+      # "undefined"; matching that keeps the recorded decision trail
+      # byte-identical across languages.
+      def self.key_text(variation)
+        variation ? variation["key"] : "undefined"
+      end
+
+      def self.now_ms
+        (Time.now.to_f * 1000).to_i
       end
 
       def self.build_result(value, variation_key, source, rule_id, rule_type, flag_key, reasons)
