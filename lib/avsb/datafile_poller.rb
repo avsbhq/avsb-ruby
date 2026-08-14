@@ -137,7 +137,7 @@ module Avsb
              when 404
                "A 404 means the CDN has no datafile for this SDK key. Either the key is " \
                "wrong or the environment has never been published: open the A vs B " \
-               "dashboard, then Settings, then Environments, and publish it."
+               "dashboard, then Environments in the project sidebar, and publish it."
              when 403
                "A 403 usually means a proxy in front of the CDN is blocking the request."
              else

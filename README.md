@@ -112,7 +112,7 @@ end
 
 An SDK key looks like `sdk_production_ttqm0eaj4vth1krcb2xn`: the prefix `sdk_`,
 your environment name, then a generated id. Copy the key for the environment you
-want from the A vs B dashboard, under Settings, then Environments.
+want from the A vs B dashboard, under Environments in the project sidebar.
 
 ```bash
 export AVSB_SDK_KEY=sdk_production_ttqm0eaj4vth1krcb2xn
