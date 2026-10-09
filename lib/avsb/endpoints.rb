@@ -63,8 +63,8 @@ module Avsb
 
     STREAM_UNAVAILABLE_REASON = 'Streaming is on, but there is no stream endpoint to connect ' \
       'to: the datafile carries no "streamEndpoint" field and no stream_endpoint: option was ' \
-      "passed. Republish the environment from the A vs B dashboard (Settings, then " \
-      "Environments) to pick up the field, or pass stream_endpoint: explicitly. Polling stays " \
+      "passed. Republish the environment from the A vs B dashboard (Environments, in the " \
+      "project sidebar) to pick up the field, or pass stream_endpoint: explicitly. Polling stays " \
       "on in the meantime, so flag changes still arrive, just on the polling interval instead " \
       "of instantly."
 

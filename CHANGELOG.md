@@ -4,13 +4,27 @@ All notable changes to the `avsb` Ruby gem are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] - Unreleased
 
-First release with a working data plane. Everything below is pre-launch, so
-these are corrections rather than deprecations: there is no earlier published
-version to migrate from.
+First release on RubyGems, and the first with a working data plane.
+Everything below is pre-launch, so these are corrections rather than
+deprecations: there is no earlier published version to migrate from.
+
+### Behaviour change to check before upgrading
+
+- **Targeted delivery rules honour their traffic allocation.** A rule set to
+  30 percent now serves its variation to 30 percent of the audience it
+  targets, where every SDK used to serve 100 percent. Visitors outside the
+  rollout fall through to the next rule, then to the flag's default. The gate
+  hashes exactly like an A/B test's traffic allocation, so a visitor is in or
+  out of a rollout identically in every A vs B SDK. A rule with no allocation
+  (`nil`) still serves everyone it targets.
 
 ### Fixed
+
+- **The supported Ruby floor is 3.2.** The gem declared 3.1, but contexts,
+  decision log entries and bandit models are `Data.define` classes, which
+  Ruby 3.2 introduced, so on 3.1 the gem failed the moment it loaded.
 
 - **The datafile URL.** The gem read
   `https://cdn.avsb.cloud/v1/datafiles/<key>.json`, which does not exist, so no

@@ -3,7 +3,7 @@
 Server-side Ruby SDK for [A vs B](https://app.avsb.cloud), the feature-flag and
 experimentation platform.
 
-Ruby 3.1 or later. Zero runtime dependencies. Rack middleware, Rails
+Ruby 3.2 or later. Zero runtime dependencies. Rack middleware, Rails
 integration, sticky bucketing, and an OpenFeature provider are included.
 
 How it works: your process downloads one JSON datafile from a global CDN,
@@ -47,7 +47,7 @@ client = Avsb::Server.new(sdk_key: ENV.fetch("AVSB_SDK_KEY"))
 client.wait_for_ready(timeout: 5)
 
 flag = client.get_bool_flag(
-  "checkout-v2",
+  "checkout_v2",
   default_value: false,
   context: { "kind" => "user", "key" => "alice", "plan" => "pro" }
 )
@@ -97,7 +97,7 @@ end
 ```ruby
 def show
   flag = avsb_client.get_bool_flag(
-    "checkout-v2",
+    "checkout_v2",
     default_value: false,
     context: { "kind" => "user", "key" => current_user.id.to_s,
                "plan" => current_user.plan }
@@ -169,12 +169,12 @@ context = {
                       "tier" => "enterprise" }
 }
 
-flag = client.get_bool_flag("enterprise-feature", default_value: false,
+flag = client.get_bool_flag("enterprise_feature", default_value: false,
                             context: context)
 ```
 
 When a rule sets `hashAttribute` to `organization.key`, everyone in the same
-organisation gets the same variation regardless of their own user key. Audience
+organization gets the same variation regardless of their own user key. Audience
 conditions scoped to a kind read only that sub-context, and a condition naming a
 kind the context does not carry never matches.
 
@@ -187,19 +187,19 @@ you get when the flag is missing, the SDK is not ready, or the flag is off.
 
 ```ruby
 # Avsb::Server#get_bool_flag(flag_key, default_value:, context: nil) -> Avsb::Flag
-show_banner = client.get_bool_flag("promo-banner", default_value: false,
+show_banner = client.get_bool_flag("promo_banner", default_value: false,
                                    context: context)
 
 # Avsb::Server#get_string_flag(flag_key, default_value:, context: nil) -> Avsb::Flag
-theme = client.get_string_flag("ui-theme", default_value: "light",
+theme = client.get_string_flag("ui_theme", default_value: "light",
                                context: context)
 
 # Avsb::Server#get_number_flag(flag_key, default_value:, context: nil) -> Avsb::Flag
-max_retries = client.get_number_flag("max-retries", default_value: 3.0,
+max_retries = client.get_number_flag("max_retries", default_value: 3.0,
                                      context: context)
 
 # Avsb::Server#get_json_flag(flag_key, default_value:, context: nil) -> Avsb::Flag
-config = client.get_json_flag("api-config", default_value: {}, context: context)
+config = client.get_json_flag("api_config", default_value: {}, context: context)
 ```
 
 Every getter returns an `Avsb::Flag`, never a bare value. Ruby is dynamically
@@ -211,7 +211,7 @@ you want the value and `flag.enabled?` when you want a gate.
 ### `Avsb::Flag`
 
 ```ruby
-flag = client.get_bool_flag("checkout-v2", default_value: false, context: context)
+flag = client.get_bool_flag("checkout_v2", default_value: false, context: context)
 
 flag.value            # Object          the evaluated value, your type
 flag.variation_key    # String, nil     nil for default, not_found, not_ready
@@ -462,9 +462,9 @@ to the view:
 def show
   ctx = { "kind" => "user", "key" => current_user.id.to_s }
   @flags = {
-    new_checkout: avsb_client.get_bool_flag("checkout-v2", default_value: false,
+    new_checkout: avsb_client.get_bool_flag("checkout_v2", default_value: false,
                                            context: ctx),
-    one_click: avsb_client.get_bool_flag("one-click-buy", default_value: false,
+    one_click: avsb_client.get_bool_flag("one_click_buy", default_value: false,
                                         context: ctx)
   }
 end
@@ -518,7 +518,7 @@ RSpec.describe "checkout flag" do
       "version" => 2,
       "sdkKey"  => "sdk_test_conformancefixture01",
       "flags"   => [{
-        "id" => "flag_checkout", "key" => "checkout-v2", "type" => "boolean",
+        "id" => "flag_checkout", "key" => "checkout_v2", "type" => "boolean",
         "enabled" => true, "defaultVariationId" => "var_off",
         "variations" => [
           { "id" => "var_off", "key" => "off", "value" => false },
@@ -544,7 +544,7 @@ RSpec.describe "checkout flag" do
   after { client.close }
 
   it "serves the on variation" do
-    flag = client.get_bool_flag("checkout-v2", default_value: false,
+    flag = client.get_bool_flag("checkout_v2", default_value: false,
                                 context: { "kind" => "user", "key" => "alice" })
 
     expect(flag.value).to be true
@@ -560,17 +560,17 @@ assertions:
 
 ```ruby
 spy = Avsb::TestUtils::SpyStickyBucketService.new(
-  preset: { "alice:checkout-v2" => { variation_id: "var_on", rule_id: "rule_ab",
+  preset: { "alice:checkout_v2" => { variation_id: "var_on", rule_id: "rule_ab",
                                      rule_type: "ab_test", assigned_at: 1 } }
 )
 client = Avsb::Server.new(sdk_key: "sdk_test_conformancefixture01",
                           datafile: datafile, sticky_bucket_service: spy,
                           events: false, polling_interval: nil)
 
-client.get_bool_flag("checkout-v2", default_value: false,
+client.get_bool_flag("checkout_v2", default_value: false,
                      context: { "kind" => "user", "key" => "alice" })
 
-expect(spy.lookups).to include({ user_id: "alice", flag_key: "checkout-v2" })
+expect(spy.lookups).to include({ user_id: "alice", flag_key: "checkout_v2" })
 ```
 
 Run the suite:
@@ -611,13 +611,13 @@ sources onto `STATIC`; and an SDK with no datafile yet onto
 ```ruby
 # LaunchDarkly
 client = LaunchDarkly::LDClient.new("sdk-key")
-value  = client.variation("checkout-v2", { key: "alice", custom: { plan: "pro" } }, false)
+value  = client.variation("checkout_v2", { key: "alice", custom: { plan: "pro" } }, false)
 ```
 
 ```ruby
 # A vs B
 client = Avsb::Server.new(sdk_key: ENV.fetch("AVSB_SDK_KEY"))
-value  = client.get_bool_flag("checkout-v2", default_value: false,
+value  = client.get_bool_flag("checkout_v2", default_value: false,
                               context: { "kind" => "user", "key" => "alice",
                                          "plan" => "pro" }).value
 ```
@@ -630,13 +630,13 @@ value, and multi-context is a plain Hash instead of a builder.
 
 ```ruby
 # Statsig
-gate = Statsig.check_gate(StatsigUser.new({ "userID" => "alice" }), "checkout-v2")
+gate = Statsig.check_gate(StatsigUser.new({ "userID" => "alice" }), "checkout_v2")
 Statsig.log_event(user, "purchase", value: 49.99)
 ```
 
 ```ruby
 # A vs B
 ctx  = { "kind" => "user", "key" => "alice" }
-gate = client.get_bool_flag("checkout-v2", default_value: false, context: ctx).enabled?
+gate = client.get_bool_flag("checkout_v2", default_value: false, context: ctx).enabled?
 client.track("purchase", context: ctx, revenue: 49.99)
 ```

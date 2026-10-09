@@ -25,7 +25,7 @@ module Avsb
   #   client = Avsb::Server.new(sdk_key: ENV.fetch("AVSB_SDK_KEY"))
   #   client.wait_for_ready(timeout: 5)
   #
-  #   flag = client.get_bool_flag("checkout-v2", default_value: false,
+  #   flag = client.get_bool_flag("checkout_v2", default_value: false,
   #                               context: { "kind" => "user", "key" => "alice" })
   #   flag.value      #=> true or false
   #   flag.enabled?   #=> decided by a rule AND truthy

@@ -143,6 +143,17 @@ module Avsb
           when "targeted_delivery"
             next if (rule["variations"] || []).empty?
 
+            # A targeted delivery rule below 100 percent is a ROLLOUT: serve
+            # the variation to that share of the audience and let everyone
+            # else fall through to the next rule, exactly as an ab_test rule's
+            # allocation does (N1-1). The gate sits after the empty-variations
+            # skip, so a rule with nothing to serve stays a silent skip.
+            td_exclusion = allocation_exclusion(rule, flag_key, hash_value)
+            if td_exclusion
+              reasons << td_exclusion
+              next
+            end
+
             target_var = get_variation(flag, rule["variations"][0]["variationId"])
             vk = target_var ? target_var["key"] : nil
             reasons << "rule \"#{rule["id"]}\" matched (targeted_delivery), " \
@@ -182,25 +193,43 @@ module Avsb
         build_result(val, key, "default", nil, nil, flag_key, reasons)
       end
 
+      # The traffic-allocation gate shared by ab_test and targeted_delivery
+      # rules. Mirrors allocationExclusion in packages/avsb-core/src/evaluate.ts.
+      # Returns the exclusion reason when the context falls outside the rule's
+      # allocation, nil when it is inside or the rule declares no gate.
+      #
+      # One hash input serves both rule types (hash value, flag key, "__",
+      # rule id), so a visitor's rollout membership is the same in every SDK
+      # and does not move when a rule changes type.
+      #
+      # The threshold is a FLOAT comparison against the raw product, never a
+      # truncated or rounded integer. A 0.12345 rollout puts the threshold at
+      # 1234.5: bucket 1234 is inside it, while a port that truncates to 1234
+      # excludes that context and diverges by one bucket in ten thousand. The
+      # boundary fixtures lock both the fractional and the integer forms.
+      #
+      # nil means no gate, and so does a field missing from an old datafile.
+      def self.allocation_exclusion(rule, flag_key, hash_value)
+        traffic = rule["trafficAllocation"]
+        return nil if traffic.nil?
+
+        alloc_hash = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}__#{rule["id"]}") % MAX_BUCKET
+        threshold  = traffic.to_f * MAX_BUCKET
+        return nil unless alloc_hash >= threshold
+
+        "rule \"#{rule["id"]}\" excluded by traffic allocation " \
+          "(hash #{alloc_hash} >= threshold #{JsValue.number_to_s(threshold)})"
+      end
+
       # ab_test branch. Returns a result Hash on a match, nil to continue to
       # the next rule.
       def self.evaluate_ab_test(flag, rule, flag_key, default_value, hash_value,
                                 reasons, on_exposure)
-        # Traffic allocation is a FLOAT comparison against the raw product,
-        # never a truncated or rounded integer. A 0.12345 rollout puts the
-        # threshold at 1234.5: bucket 1234 is inside it, while a port that
-        # truncates to 1234 excludes that context and diverges by one bucket
-        # in ten thousand. The boundary fixtures lock both the fractional and
-        # the integer forms.
-        alloc_hash = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}__#{rule["id"]}") % MAX_BUCKET
-        traffic    = rule["trafficAllocation"]
-        unless traffic.nil?
-          threshold = traffic.to_f * MAX_BUCKET
-          if alloc_hash >= threshold
-            reasons << "rule \"#{rule["id"]}\" excluded by traffic allocation " \
-                       "(hash #{alloc_hash} >= threshold #{JsValue.number_to_s(threshold)})"
-            return nil
-          end
+        # Traffic allocation, shared with targeted_delivery rules.
+        exclusion = allocation_exclusion(rule, flag_key, hash_value)
+        if exclusion
+          reasons << exclusion
+          return nil
         end
 
         bucket     = Avsb::Core::Hash.murmurhash3("#{hash_value}#{flag_key}") % MAX_BUCKET

@@ -24,7 +24,9 @@ Gem::Specification.new do |spec|
     "changelog_uri"     => "https://github.com/avsbhq/avsb-ruby/blob/main/CHANGELOG.md"
   }
 
-  spec.required_ruby_version = ">= 3.1.0"
+  # Data.define (contexts, decision log entries, bandit models) arrived in
+  # Ruby 3.2, so 3.1 failed with NoMethodError the moment the gem loaded.
+  spec.required_ruby_version = ">= 3.2.0"
 
   # CHANGELOG.md ships in the gem because metadata["changelog_uri"] points at
   # it, and that link was dead until the file existed.
