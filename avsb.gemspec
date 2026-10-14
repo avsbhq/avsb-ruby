@@ -32,7 +32,10 @@ Gem::Specification.new do |spec|
   # it, and that link was dead until the file existed.
   spec.files = Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE", "avsb.gemspec"]
 
-  # Runtime: zero hard dependencies — optional integrations guard-require at call-time.
+  # Runtime: one dependency. logger is no longer a default gem from Ruby 4.0,
+  # so without it `require "avsb"` raised LoadError on Ruby 4. Optional
+  # integrations guard-require at call time.
+  spec.add_dependency "logger", ">= 1.6"
 
   # Optional integrations (documented in README):
   #   gem "redis", "~> 5.0"          # for Avsb::Sticky::Redis

@@ -22,6 +22,10 @@ deprecations: there is no earlier published version to migrate from.
 
 ### Fixed
 
+- **The gem loads on Ruby 4.0.** `logger` stopped being a default gem in Ruby
+  4.0, and the gem required it without declaring it, so `require "avsb"`
+  raised `LoadError` there. It is now a runtime dependency (`logger >= 1.6`).
+
 - **The supported Ruby floor is 3.2.** The gem declared 3.1, but contexts,
   decision log entries and bandit models are `Data.define` classes, which
   Ruby 3.2 introduced, so on 3.1 the gem failed the moment it loaded.

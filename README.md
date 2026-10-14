@@ -3,7 +3,8 @@
 Server-side Ruby SDK for [A vs B](https://app.avsb.cloud), the feature-flag and
 experimentation platform.
 
-Ruby 3.2 or later. Zero runtime dependencies. Rack middleware, Rails
+Ruby 3.2 or later. One runtime dependency, the `logger` gem (no longer bundled
+with Ruby from 4.0). Rack middleware, Rails
 integration, sticky bucketing, and an OpenFeature provider are included.
 
 How it works: your process downloads one JSON datafile from a global CDN,

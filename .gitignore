@@ -1,0 +1,4 @@
+# A library does not commit its lockfile: consumers resolve their own versions.
+Gemfile.lock
+*.gem
+.bundle/
