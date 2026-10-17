@@ -4,6 +4,7 @@ require_relative "hash"
 require_relative "js_value"
 require_relative "context_resolver"
 require_relative "audience_commerce"
+require_relative "semver"
 
 module Avsb
   module Core
@@ -136,6 +137,11 @@ module Avsb
         when "not_in_list"
           list = raw_val.is_a?(Array) ? raw_val : [raw_val]
           list.none? { |v| actual.to_s == v.to_s }
+        # Version comparison (semver.rb) reads the raw attribute: a number
+        # converts the way JavaScript prints it, and any other type is no
+        # match. An SDK that predates these operators reaches `else`.
+        when "semver_eq", "semver_neq", "semver_gt", "semver_gte", "semver_lt", "semver_lte"
+          SemVer.evaluate(condition["operator"], actual, expected)
         else
           false
         end

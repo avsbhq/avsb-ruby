@@ -4,6 +4,19 @@ All notable changes to the `avsb` Ruby gem are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - Unreleased
+
+### Added
+
+- **Version operators for targeting.** Six new operators compare a string
+  attribute as a version number: `semver_eq`, `semver_neq`, `semver_gt`,
+  `semver_gte`, `semver_lt` and `semver_lte`. `2.10.0` is greater than
+  `2.9.1`, a pre-release comes before its release (`2.0.0-beta.2` is less
+  than `2.0.0`), a leading `v` and short forms such as `2.3` are accepted,
+  and build metadata after a `+` is ignored. A value that is not a version,
+  or an attribute that is neither a string nor a number, never matches.
+  Version 1.0.1 treats these conditions as not matching.
+
 ## [1.0.1] - Unreleased
 
 First release on RubyGems, and the first with a working data plane.
